@@ -1,5 +1,7 @@
 package com.likelion.springsession.comment.controller;
 
+import com.likelion.springsession.auth.dto.ReissueRequest;
+import com.likelion.springsession.auth.dto.TokenResponse;
 import com.likelion.springsession.comment.dto.CommentCreateRequest;
 import com.likelion.springsession.comment.dto.CommentResponse;
 import com.likelion.springsession.comment.dto.CommentUpdateRequest;
@@ -7,6 +9,7 @@ import com.likelion.springsession.comment.service.CommentService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -19,9 +22,9 @@ public class CommentController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    public CommentResponse create(@PathVariable("postId") Long postId,
+    public CommentResponse create(@AuthenticationPrincipal Long userId, @PathVariable("postId") Long postId,
                                   @Valid @RequestBody CommentCreateRequest request) {
-        return commentService.addComment(postId, request);
+        return commentService.addComment(userId, postId, request);
     }
 
     @GetMapping
@@ -29,16 +32,24 @@ public class CommentController {
         return commentService.getComments(postId);
     }
     @PutMapping("/{commentId}")
-    public CommentResponse update(@PathVariable("postId") Long postId,
-                                  @PathVariable("commentId") Long commentId,
-                                  @Valid @RequestBody CommentUpdateRequest request) {
-        return commentService.updateComment(postId, commentId, request);
+    public CommentResponse update(
+            @AuthenticationPrincipal Long userId,
+            @PathVariable("postId") Long postId,
+            @PathVariable("commentId") Long commentId,
+            @Valid @RequestBody CommentUpdateRequest request
+    ) {
+        return commentService.updateComment(
+                userId, postId, commentId, request
+        );
     }
 
     @DeleteMapping("/{commentId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void delete(@PathVariable("postId") Long postId,
-                       @PathVariable("commentId") Long commentId) {
-        commentService.deleteComment(postId, commentId);
+    public void delete(
+            @AuthenticationPrincipal Long userId,
+            @PathVariable("postId") Long postId,
+            @PathVariable("commentId") Long commentId
+    ) {
+        commentService.deleteComment(userId, postId, commentId);
     }
 }
