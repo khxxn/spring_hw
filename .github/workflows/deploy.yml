@@ -9,11 +9,9 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1. 내 코드 내려받기
       - name: Checkout code
         uses: actions/checkout@v5
 
-      # 2. AWS 로그인 (GitHub Secrets 의 액세스 키 사용)
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v6
         with:
@@ -21,15 +19,45 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ap-northeast-2
 
-      # 3. ECR 로그인
       - name: Login to Amazon ECR
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
-      # 4. 도커 이미지 빌드해서 ECR에 올리기
       - name: Build and push image to ECR
         uses: docker/build-push-action@v7
         with:
           context: .
           push: true
           tags: ${{ steps.login-ecr.outputs.registry }}/likelion-spring-app:latest
+
+      - name: Deploy to EC2
+        uses: appleboy/ssh-action@v1.2.2
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ubuntu
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            export PATH=$PATH:/snap/bin
+            REGISTRY=${{ steps.login-ecr.outputs.registry }}
+            IMAGE=$REGISTRY/likelion-spring-app:latest
+
+            aws ecr get-login-password --region ap-northeast-2 \
+              | docker login --username AWS --password-stdin $REGISTRY
+
+            docker pull $IMAGE
+
+            docker stop likelion-app || true
+            docker rm likelion-app || true
+
+            docker run -d \
+              --name likelion-app \
+              --restart unless-stopped \
+              --env-file /home/ubuntu/app.env \
+              -p 8080:8080 \
+              $IMAGE
+
+            docker image prune -af
+
+            echo "===== Application Logs ====="
+            sleep 5
+            docker logs --tail 30 likelion-app
